@@ -83,9 +83,9 @@ spec:
           resources:
             requests:
               cpu: "4"
-              memory: 6Gi
+              memory: 8Gi
             limits:
-              memory: 6Gi                    # лимит CPU намеренно не ставим, см. гайд
+              memory: 8Gi                    # лимит CPU намеренно не ставим, см. гайд
           startupProbe:                      # даёт до 10 минут на загрузку модели и прогрев
             httpGet:
               path: /health
