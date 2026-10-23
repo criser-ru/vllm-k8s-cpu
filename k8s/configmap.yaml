@@ -1,0 +1,36 @@
+# Все настройки инференса. Меняются без пересборки образа:
+#   отредактировать -> kubectl apply -k k8s/ -> kubectl -n llm-inference rollout restart deployment/vllm
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vllm-env
+  namespace: llm-inference
+data:
+  # --- какую модель качать и где она лежит на PVC
+  MODEL_ID: "Qwen/Qwen2.5-0.5B-Instruct"
+  MODEL_REVISION: "main"
+  MODEL_DIR: "/models/qwen2.5-0.5b-instruct"
+  # --- настройки CPU-бэкенда vLLM (читаются из переменных окружения)
+  VLLM_CPU_KVCACHE_SPACE: "2"          # ГиБ под KV-кэш
+  VLLM_CPU_NUM_OF_RESERVED_CPU: "1"    # 1 ядро под HTTP-сервер, остальные под вычисления
+  # --- не отправлять статистику использования разработчикам vLLM
+  VLLM_NO_USAGE_STATS: "1"
+  DO_NOT_TRACK: "1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vllm-serve-config
+  namespace: llm-inference
+data:
+  # Монтируется файлом /etc/vllm/config.yaml и передаётся в `vllm serve --config`.
+  # Ключи - те же, что флаги vllm serve, без двух дефисов.
+  config.yaml: |
+    served-model-name: qwen2.5-0.5b-instruct
+    dtype: bfloat16
+    max-model-len: 4096
+    max-num-seqs: 16
+    max-num-batched-tokens: 4096
+    enable-prefix-caching: true
+    enable-log-requests: true
+    disable-access-log-for-endpoints: /health,/metrics

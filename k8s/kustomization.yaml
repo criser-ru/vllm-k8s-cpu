@@ -1,0 +1,24 @@
+# kubectl apply -k k8s/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: llm-inference
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: vllm-cpu
+    includeSelectors: false    # не трогаем selector Deployment (он неизменяемый)
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  # Secret сюда намеренно не входит: он создаётся отдельно и не хранится в git
+
+images:                        # теги образов меняются в одном месте
+  - name: vllm-cpu
+    newTag: "0.32.0"
+  - name: model-downloader
+    newTag: "1.0"

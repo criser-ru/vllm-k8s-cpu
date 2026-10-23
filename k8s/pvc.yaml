@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vllm-models
+  namespace: llm-inference
+spec:
+  accessModes:
+    - ReadWriteOnce            # диск подключается к одному узлу; для Minikube этого достаточно
+  resources:
+    requests:
+      storage: 10Gi            # 0.5B ~1 ГБ, 1.5B ~3 ГБ, с запасом под смену модели
+  # storageClassName не указан -> берётся класс по умолчанию (в Minikube это standard)

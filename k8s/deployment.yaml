@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: llm-inference
+  labels:
+    app: vllm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate             # старый под удаляется до старта нового: PVC ReadWriteOnce и мало памяти
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      automountServiceAccountToken: false    # поду не нужен доступ к API Kubernetes
+      terminationGracePeriodSeconds: 30
+      securityContext:                       # для всех контейнеров пода
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000                        # тома доступны группе 1000 на запись
+        seccompProfile:
+          type: RuntimeDefault
+
+      initContainers:
+        - name: model-downloader
+          image: model-downloader:1.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: vllm-env
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vllm-secrets
+                  key: HF_TOKEN
+                  optional: true             # для открытых моделей токен не обязателен
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            - name: tmp
+              mountPath: /tmp
+
+      containers:
+        - name: vllm
+          image: vllm-cpu:0.32.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: vllm-env
+          env:
+            - name: VLLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vllm-secrets
+                  key: VLLM_API_KEY
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "4"
+              memory: 6Gi
+            limits:
+              memory: 6Gi                    # лимит CPU намеренно не ставим, см. гайд
+          startupProbe:                      # даёт до 10 минут на загрузку модели и прогрев
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:                    # трафик идёт в под, только когда модель готова
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:                     # перезапуск, если сервер завис
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true                 # vLLM модель только читает
+            - name: serve-config
+              mountPath: /etc/vllm
+              readOnly: true
+            - name: dshm
+              mountPath: /dev/shm
+            - name: tmp
+              mountPath: /tmp
+            - name: home
+              mountPath: /home/app           # кэши torch.compile и vLLM
+
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: vllm-models
+        - name: serve-config
+          configMap:
+            name: vllm-serve-config
+        - name: dshm                         # разделяемая память для процессов vLLM
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: tmp
+          emptyDir: {}
+        - name: home
+          emptyDir: {}

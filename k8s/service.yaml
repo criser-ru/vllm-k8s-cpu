@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: llm-inference
+spec:
+  type: ClusterIP              # доступен внутри кластера; снаружи - через kubectl port-forward
+  selector:
+    app: vllm
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
