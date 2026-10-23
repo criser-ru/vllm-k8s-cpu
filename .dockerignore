@@ -1,0 +1,5 @@
+.git
+k8s/secret.yaml
+.env
+**/__pycache__
+bench/results
