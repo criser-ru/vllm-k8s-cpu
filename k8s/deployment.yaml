@@ -17,7 +17,8 @@ spec:
       labels:
         app: vllm
     spec:
-      automountServiceAccountToken: false    # поду не нужен доступ к API Kubernetes
+      automountServiceAccountToken: false
+      enableServiceLinks: false              # без переменных VLLM_PORT=tcp://... от Service "vllm", они ломают vLLM    # поду не нужен доступ к API Kubernetes
       terminationGracePeriodSeconds: 30
       securityContext:                       # для всех контейнеров пода
         runAsNonRoot: true
