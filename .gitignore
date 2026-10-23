@@ -1,0 +1,5 @@
+k8s/secret.yaml
+.env
+__pycache__/
+*.pyc
+bench/results/*.json
